@@ -1,0 +1,1 @@
+part 'collection_model.dart';
