@@ -8,10 +8,7 @@ import '../../utils/utils.dart';
 import '../collection.dart';
 
 class CollectionRepository {
-  CollectionRepository({
-    required this.cacheClient,
-    required this.connectivity,
-  });
+  CollectionRepository({required this.cacheClient, required this.connectivity});
 
   final CacheClient cacheClient;
   final Connectivity connectivity;
@@ -22,20 +19,20 @@ class CollectionRepository {
     final isOnline = !connResult.contains(ConnectivityResult.none);
 
     if (isOnline) {
-      // 1️⃣ Fetch from assets
-      final jsonString =
-          await rootBundle.loadString('assets/my_collection_mock.json');
+      final jsonString = await rootBundle.loadString(
+        'assets/my_collection_mock.json',
+      );
 
-      // 2️⃣ Cache the raw JSON string
-      cacheClient.write<String>(key: AppKeys.collectionsCacheKey, value: jsonString);
+      cacheClient.write<String>(
+        key: AppKeys.collectionsCacheKey,
+        value: jsonString,
+      );
 
-      // 3️⃣ Decode & return
       final List<dynamic> list = json.decode(jsonString);
       return list
           .map((e) => CollectionModel.fromJson(e as Map<String, dynamic>))
           .toList();
     } else {
-      // 💤 Offline: read from cache
       final cached = cacheClient.read<String>(key: AppKeys.collectionsCacheKey);
       if (cached != null && cached.isNotEmpty) {
         final List<dynamic> list = json.decode(cached);
@@ -43,9 +40,33 @@ class CollectionRepository {
             .map((e) => CollectionModel.fromJson(e as Map<String, dynamic>))
             .toList();
       } else {
-        // no data cached yet
         throw Exception('No offline data available');
       }
     }
+  }
+
+  Future<List<CollectionModel>> filterOffline({
+    String? nameContains,
+    int? minCount,
+  }) async {
+    final cached = cacheClient.read<String>(key: AppKeys.collectionsCacheKey);
+    if (cached == null || cached.isEmpty) {
+      throw Exception('No offline data available');
+    }
+
+    final List<dynamic> raw = json.decode(cached);
+    final all = raw
+        .map((e) => CollectionModel.fromJson(e as Map<String, dynamic>))
+        .toList();
+
+    return all.where((item) {
+      final matchName =
+          nameContains == null ||
+          (item.name?.toLowerCase().contains(nameContains.toLowerCase()) ??
+              false);
+      final matchCount =
+          minCount == null || (item.count != null && item.count! >= minCount);
+      return matchName && matchCount;
+    }).toList();
   }
 }
